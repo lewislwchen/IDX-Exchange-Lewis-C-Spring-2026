@@ -1,0 +1,12 @@
+*.csv
+*.xlsx
+*.db
+*.sqlite
+Files/raw/
+.env
+.DS_Store
+__pycache__/
+*.csv
+*.xlsx
+Files/raw/
+.DS_Store
