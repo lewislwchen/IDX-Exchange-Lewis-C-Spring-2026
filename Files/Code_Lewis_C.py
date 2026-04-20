@@ -67,28 +67,3 @@ listings_with_rates.to_csv('CRMLSListing_Enriched.csv', index=False)
 
 print("\nProcess completed. Enriched datasets saved as 'CRMLSSold_Enriched.csv' and 'CRMLSListing_Enriched.csv'.")
 
-
-# 1. 创建忽略文件 (最关键：确保本地数据不被上传)
-echo "*.csv
-*.xlsx
-*.db
-*.sqlite
-Files/raw/
-.env
-.DS_Store
-__pycache__/" > .gitignore
-
-# 2. 初始化并关联仓库
-git init
-git remote add origin https://github.com/lewislwchen/IDX-Exchange-Lewis-C-Spring-2026.git
-git branch -M main
-
-# 3. 添加文件并提交 (Git 会自动跳过 .gitignore 里的文件)
-git add .
-git commit -m "Initial commit: code logic and environment setup (data excluded for privacy)"
-
-# 4. 拉取远程更改并合并 (处理 GitHub 自动生成的 README)
-git pull origin main --rebase
-
-# 5. 正式推送
-git push -u origin main
