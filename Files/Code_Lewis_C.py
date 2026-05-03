@@ -67,8 +67,6 @@ listings_with_rates.to_csv('CRMLSListing_Enriched.csv', index=False)
 
 print("\nProcess completed. Enriched datasets saved as 'CRMLSSold_Enriched.csv' and 'CRMLSListing_Enriched.csv'.")
 
-<<<<<<< HEAD
-=======
 #Week 4-5
 import numpy as np
 
@@ -76,10 +74,7 @@ import numpy as np
 df = pd.read_csv('CRMLSSold_Enriched.csv', low_memory=False)
 df.head()
 
-
 print("Week 4-5: Data Cleaning and Preparation")
-
-# 读取上一步 (Week 2-3) 跑出来的 Enriched 融合数据集
 
 initial_row_count = len(df)
 print(f"(Before cleaning Row Count): {initial_row_count}")
