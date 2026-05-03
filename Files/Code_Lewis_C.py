@@ -138,7 +138,7 @@ df['out_of_state_flag'] = (
 )
 
 # ==========================================
-# 5. 打印 Deliverable 要求的各项汇总报告
+# 5. Print summary of data quality issues found
 
 print("\n=== Date-Consistency Flag Counts ===")
 print(f"listing_after_close_flag: {df['listing_after_close_flag'].sum()} ")
