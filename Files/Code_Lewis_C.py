@@ -171,3 +171,137 @@ print(f"Total removed rows: {initial_row_count - final_row_count}")
 # Save the clean dataset
 clean_df.to_csv('CRMLSSold_Cleaned.csv', index=False)
 print("\nAnalysis-ready clean dataset saved as 'CRMLSSold_Cleaned.csv'! Deliverable achieved.")
+
+
+#Week 6 Feature Engineering and Market Metrics
+
+# %%
+import pandas as pd
+df = pd.read_csv('CRMLSSold_Cleaned.csv', low_memory=False)
+
+date_cols = ['CloseDate', 'PurchaseContractDate', 'ListingContractDate']
+for col in date_cols:
+    df[col] = pd.to_datetime(df[col], errors='coerce')
+
+df['Price_Ratio'] = df['ClosePrice'] / df['OriginalListPrice']
+df['Price_Per_SqFt'] = df['ClosePrice'] / df['LivingArea']
+df['Days on Market'] = df['DaysOnMarket']
+df['Year'] = df['CloseDate'].dt.year
+df['Month'] = df['CloseDate'].dt.month
+df['YrMo'] = df['CloseDate'].dt.strftime('%Y-%m')
+
+df['Listing_to_Contract_Days'] = (df['PurchaseContractDate'] - df['ListingContractDate']).dt.days
+df['Contract_to_Close_Days'] = (df['CloseDate'] - df['PurchaseContractDate']).dt.days
+
+#Sample output table
+engineered_cols = ['ClosePrice', 'OriginalListPrice', 'Price_Ratio', 'Price_Per_SqFt', 
+                   'YrMo', 'Listing_to_Contract_Days', 'Contract_to_Close_Days']
+print(df[engineered_cols].sample(n=5, random_state=42))
+
+# Segment Analysis
+print("\n Segment Analysis")
+
+metrics_to_summarize = ['ClosePrice', 'Price_Per_SqFt', 'Price_Ratio', 'Listing_to_Contract_Days']
+
+# Segment property type (PropertyType)
+print("\n Grouped by PropertyType:")
+summary_by_type = df.groupby('PropertyType')[metrics_to_summarize].mean().round(2)
+print(summary_by_type)
+
+# Test Mean - CountyOrParish column exists before grouping, as not all datasets may have this column. If it does exist, we can do the grouping; if not, we skip this part.
+if 'CountyOrParish' in df.columns:
+    print("\n Check: Grouped by CountyOrParish:")
+    summary_by_county = df.groupby('CountyOrParish')[metrics_to_summarize].mean().round(2)
+    
+    print(summary_by_county.sample(n=5, random_state=42))
+
+else:
+    print("\n Current dataset does not contain 'CountyOrParish' column, skipping county-level segmentation.")
+
+
+# Prepare tableau Ready dataset
+df.to_csv('CRMLSSold_Master_Engineered.csv', index=False)
+print("\nFull dataset with engineered features saved as 'CRMLSSold_Master_Engineered.csv'!")
+
+
+
+# %%
+# Week 7 Outlier Detection and Data Quality
+import pandas as pd
+
+df = pd.read_csv('CRMLSSold_Master_Engineered.csv', low_memory=False)
+
+# ensure the three key columns we want to check for outliers are numeric, 
+# if they are not, convert them 
+# (this is a common issue where sometimes numeric columns can be read as object due to bad data)
+target_cols = ['ClosePrice', 'LivingArea', 'DaysOnMarket']
+for col in target_cols:
+    df[col] = pd.to_numeric(df[col], errors='coerce')
+
+#calculate length & median 
+initial_row_count = len(df)
+initial_medians = df[target_cols].median()
+
+# define flag_outliers for the first doc
+def flag_outliers(series):
+    Q1 = series.quantile(0.25)
+    Q3 = series.quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    # if value is less than lower_bound or greater than upper_bound, it's an outlier
+    return (series < lower_bound) | (series > upper_bound)
+
+print("\n Scanning for outliers in ClosePrice, LivingArea, and DaysOnMarket...")
+
+for col in target_cols:
+    flag_col_name = f'{col}_Outlier_Flag'
+    df[flag_col_name] = flag_outliers(df[col])
+    outlier_count = df[flag_col_name].sum()
+    print(f"[{col}] outliers: {outlier_count} rows")
+
+
+# Doc 1: Flagged version - 
+# we keep all data but add flags to indicate which rows are outliers in any of the three key columns. 
+# This allows for flexible filtering later on if needed, 
+# while preserving the full dataset for any analyses that might want to consider outliers.
+df.to_csv('CRMLSSold_W7_Flagged.csv', index=False)
+print("\n Flagged dataset saved as 'CRMLSSold_W7_Flagged.csv'")
+
+# Create a clean dataset by filtering out all rows 
+# that are flagged as outliers in any of the three key columns.
+clean_df = df[
+    ~(df['ClosePrice_Outlier_Flag']) &
+    ~(df['LivingArea_Outlier_Flag']) &
+    ~(df['DaysOnMarket_Outlier_Flag'])
+].copy()
+
+# Doc 2 Tableau-ready version
+# we filter out all rows that are flagged as outliers in any of the three key columns,
+clean_df.to_csv('CRMLSSold_W7_Filtered.csv', index=False)
+print("Clean dataset saved as 'CRMLSSold_W7_Filtered.csv'")
+
+#Writtenn comparison report
+print('written comparison report...')
+final_row_count = len(clean_df)
+final_medians = clean_df[target_cols].median()
+
+print("\n" + "="*50)
+print(" Week 7: Written Comparison")
+print("="*50)
+
+print(f"\n Dataset Size")
+print(f"Initial Row Counts: {initial_row_count}")
+print(f"Filtered Row Counts: {final_row_count}")
+print(f"Total Outliers Removed:   {initial_row_count - final_row_count} rows ({(initial_row_count - final_row_count)/initial_row_count*100:.2f}%)")
+
+print(f"\n Median Values")
+comparison_df = pd.DataFrame({
+    'Before Filtering': initial_medians,
+    'After Filtering': final_medians
+})
+
+comparison_df['% Change'] = ((comparison_df['After Filtering'] - comparison_df['Before Filtering']) / comparison_df['Before Filtering'] * 100).round(2).astype(str) + '%'
+
+print(comparison_df)
+# %%
