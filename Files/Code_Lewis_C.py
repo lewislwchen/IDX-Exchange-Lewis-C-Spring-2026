@@ -223,8 +223,6 @@ else:
 df.to_csv('CRMLSSold_Master_Engineered.csv', index=False)
 print("\nFull dataset with engineered features saved as 'CRMLSSold_Master_Engineered.csv'!")
 
-
-
 # %%
 # Week 7 Outlier Detection and Data Quality
 import pandas as pd
@@ -304,4 +302,91 @@ comparison_df = pd.DataFrame({
 comparison_df['% Change'] = ((comparison_df['After Filtering'] - comparison_df['Before Filtering']) / comparison_df['Before Filtering'] * 100).round(2).astype(str) + '%'
 
 print(comparison_df)
+# %%
+
+#%%
+# Feature Engineering Extension - My personal deep dive into the geospatial analysis
+
+import pandas as pd
+import numpy as np
+from sklearn.cluster import KMeans
+df = pd.read_csv('CRMLSSold_Master_Engineered.csv', low_memory=False)
+# 1) Micro_Neigborhood ID as suppose to traditional Zip code segmentations
+print("Generating Micro-Neighborhood ID...")
+
+# Create a cluster count = 500
+n_clusters = 500 
+
+# Extract the coordinates for clustering, dropping rows with missing coordinates
+coords = df[['Latitude', 'Longitude']].dropna()
+
+# Train KMeans model ***
+kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
+df.loc[coords.index, 'Micro_Neighborhood_ID'] = kmeans.fit_predict(coords)
+
+# Transfrom ID into a string column
+df['Micro_Neighborhood_ID'] = df['Micro_Neighborhood_ID'].astype(str)
+
+# 2) Neighborhood Price Momentum - calculate the average price per square foot for each 
+# micro-neighborhood each month, then create a lagged variable to capture the momentum 
+# (i.e., how much the price has changed compared to the previous month in that micro-neighborhood).
+print("Calculating the Neighborhood Price Momentum...")
+
+# 1. Calculate the average price per square foot for each micro-neighborhood each month
+monthly_neighborhood_price = df.groupby(['Micro_Neighborhood_ID', 'YrMo'])['Price_Per_SqFt'].mean().reset_index()
+
+# 2. Sort the data by neighborhood and month
+monthly_neighborhood_price = monthly_neighborhood_price.sort_values(['Micro_Neighborhood_ID', 'YrMo'])
+
+# 3. Create Lagged Variable
+# *** Use last week's mean price as lagged variable
+monthly_neighborhood_price['Price_Momentum_Lag1'] = monthly_neighborhood_price.groupby('Micro_Neighborhood_ID')['Price_Per_SqFt'].shift(1)
+
+# 4. Merge the momentum back into the main dataset
+df = df.merge(
+    monthly_neighborhood_price[['Micro_Neighborhood_ID', 'YrMo', 'Price_Momentum_Lag1']], 
+    on=['Micro_Neighborhood_ID', 'YrMo'], 
+    how='left'
+)
+# 3) Distance to Coastline
+print("Calculating Distance to Coastline...")
+
+# Major longitude and latitude points along the California coast
+coastal_points = [
+    (37.7749, -122.4194), # San Francisco
+    (36.6002, -121.8947), # Monterey
+    (34.4208, -119.6982), # Santa Barbara
+    (34.0195, -118.4912), # Santa Monica
+    (32.7157, -117.1611)  # San Diego
+]
+
+# define haversine_vectorized
+def haversine_vectorized(lat1, lon1, lat2, lon2):
+
+    lat1, lon1, lat2, lon2 = map(np.radians, [lat1, lon1, lat2, lon2])
+    
+    dlat = lat2 - lat1
+    dlon = lon2 - lon1
+    
+    a = np.sin(dlat/2.0)**2 + np.cos(lat1) * np.cos(lat2) * np.sin(dlon/2.0)**2
+    c = 2 * np.arcsin(np.sqrt(a))
+    r = 3956 # earth radius in miles
+    return c * r
+
+# Compute for the shortest distance to the coast for each property
+min_distances = np.full(len(df), np.inf)
+
+for coast_lat, coast_lon in coastal_points:
+    dist = haversine_vectorized(df['Latitude'], df['Longitude'], coast_lat, coast_lon)
+    min_distances = np.minimum(min_distances, dist)
+
+df['Distance_to_Coast_Miles'] = min_distances.round(2)
+
+print("\n--- Spatial Feature Engineering Complete ---")
+print(df[['Latitude', 'Longitude', 'Micro_Neighborhood_ID', 'Price_Momentum_Lag1', 'Distance_to_Coast_Miles']].head())
+
+# Save the updated dataset with new features
+df.to_csv('CRMLSSold_W7_Filtered.csv', index=False)
+
+print("\n Latest Edition: CRMLSSold_W7_Filtered.csv！")
 # %%
